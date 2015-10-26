@@ -1,0 +1,126 @@
+//the read system call =6 calls interrupt3
+
+alias physicalSP S0;
+
+//formula to calculate sp
+
+physicalSP= ([PTBR+2*(SP/512)]*512)+(SP%512);
+
+//register for systemcallnumber
+
+alias sys_call_Number S1;
+alias value S2;
+alias fileSeekValue S3;
+alias fileDescriptor S4;
+alias temp_count S5;
+alias perProcessIndex S6;
+alias currentPCB S7;
+alias fileSwocEntry S8;
+alias fatEntry S9;
+
+//we reduce by 1 because in memory address or values take one word
+
+sys_call_Number=[physicalSP-1];
+
+//getting the arguments, if there are n arguments we need n registers.
+
+	fileDescriptor=[physicalSP-4];
+	value=[physicalSP-3];
+
+  //sys_call_number for read is 7.
+
+if(sys_call_Number==7) then
+    
+    if(fileDescriptor<0 || fileDescriptor>7) then
+    	[physicalSP-2]=-1;
+        ireturn;
+    endif;
+
+    //get PID,then from PCB load the value of file descriptor
+
+    currentPCB= (PTBR-1024)/8;
+    currentPCB=  READY_LIST+currentPCB*32;
+    perProcessIndex=currentPCB+15+2*fileDescriptor;
+    if([perProcessIndex]==-1) then
+    	[physicalSP-2]=-1;
+    	ireturn;
+    endif;
+
+   //filedescriptor-> index of perprocess open file table
+    //[perprocess]-> swoc index
+    //[swoc position]-> fat index == [perprocessindex]
+    
+    fileSeekValue=[perProcessIndex+1];
+    fileSwocEntry=[perProcessIndex]*2+FILE_TABLE;
+    fatEntry=[fileSwocEntry]*8+FAT;
+
+    load (1,[fatEntry+2]);
+    //currentPCB doubles up as the value of the datablock;
+
+     if(fileSeekValue>=[fatEntry+1]||fileSeekValue<0) then
+      [physicalSP-2]=-1;
+      ireturn;
+    endif;
+
+
+
+    currentPCB=fileSeekValue/512+SCRATCHPAD;
+    if([currentPCB]==-1) then
+        [physicalSP-2]=-1;
+        ireturn;
+    endif;
+
+    load(1,[currentPCB]);
+    value=[SCRATCHPAD+fileSeekValue%512];
+    [physicalSP-3]=value;
+
+    [perProcessIndex+1]=[perProcessIndex+1]+1;
+
+    [physicalSP-2]=0;
+    ireturn;
+endif;
+
+
+
+
+// the sys call number for lseek is 6
+
+if(sys_call_Number==6) then
+    
+    if(fileDescriptor<0 && fileDescriptor>7) then
+      [physicalSP-2]=-1;
+        ireturn;
+    endif;
+
+    //get PID,then from PCB load the value of file descriptor
+
+    currentPCB= (PTBR-1024)/8;
+    currentPCB=  READY_LIST+currentPCB*32;
+    perProcessIndex=currentPCB+15+2*fileDescriptor;
+    
+    if([perProcessIndex]==-1) then
+      [physicalSP-2]=-1;
+      ireturn;
+    endif;
+
+   //filedescriptor-> index of perprocess open file table
+    //[perprocess]-> swoc index
+    //[swoc position]-> fat index == [perprocessindex]
+    
+    fileSeekValue=[perProcessIndex+1];
+    fileSwocEntry=[perProcessIndex]*2+FILE_TABLE;
+    fatEntry=[fileSwocEntry]*8+FAT;
+
+    
+    //currentPCB doubles up as the value of the datablock;
+
+     if(value>=[fatEntry+1]&&value<0) then
+      [physicalSP-2]=-1;
+      ireturn;
+    endif;
+
+    [perProcessIndex+1]=value;
+
+    [physicalSP-2]=0;
+    ireturn;
+endif;

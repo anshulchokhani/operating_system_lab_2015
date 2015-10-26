@@ -1,0 +1,25 @@
+//for fork system call
+//sys_call_no = 8
+
+alias physicalSP S0;
+
+//formula to calculate sp
+
+physicalSP= ([PTBR+2*(SP/512)]*512)+(SP%512);
+
+//register for systemcallnumber
+
+alias sys_call_Number S1;
+alias value S2;
+alias fileSeekValue S3;
+alias fileDescriptor S4;
+alias temp_count S5;
+alias perProcessIndex S6;
+alias currentPCB S7;
+alias fileSwocEntry S8;
+alias fatEntry S9;
+
+
+//we reduce by 1 because in memory address or values take one word
+
+sys_call_Number=[physicalSP-1];

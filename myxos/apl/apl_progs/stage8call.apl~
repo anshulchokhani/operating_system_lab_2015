@@ -1,0 +1,50 @@
+decl
+	integer a;
+	integer choice;
+	integer status;
+	string b;
+enddecl
+integer main()
+{
+	print  ("1.create");
+	
+	print  ("2.open");
+	print  ("3.write");
+	print  ("4.read");
+	print  ("5.close");
+	print  ("6.delete");
+	print ("7.lseek change");
+	
+//	status=Create("ABC.dat");
+//	print (status+5);
+	
+        //Status=Open ("ABC.dat");
+			
+	print ("enter choice");
+	
+	read (choice);
+	
+	if(choice==3) then
+	
+        	status=Write (0,"abc");
+	    print (status);
+	endif;
+	
+	if(choice==4) then
+	
+	 status=Read (0,b);
+	 print (status);
+	 print(b);
+	endif;
+	
+	if(choice==7) then
+
+	 status=Seek (0,14);
+	 print (status);
+	endif;
+	
+	return 0;
+	
+	}
+	
+	

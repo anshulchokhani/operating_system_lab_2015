@@ -1,0 +1,158 @@
+//interrupt2 is called for open and close both have one argument
+alias physicalSP S0;
+
+//formula to calculate sp
+
+physicalSP= ([PTBR+2*(SP/512)]*512)+(SP%512);
+
+//register for systemcallnumber
+
+alias sys_call_Number S1;
+
+//we reduce by 1 because in memory address or values take one word
+
+sys_call_Number=[physicalSP-1];
+
+//getting the arguments, if there are n arguments we need n registers.
+//since open and close both have only one argument we take only one register
+
+alias arg_fileName S2;
+arg_fileName = [physicalSP-3]; 
+
+alias temp_count S3;
+alias fat_index S7;
+alias temp_swoc S4;
+alias currentPCB S5;
+alias per_pointer S6;
+
+
+if(sys_call_Number==2) then
+	temp_count=FAT;
+	//check if it's already there in the disk
+	while (temp_count <FAT+512) do //check
+		if([temp_count]==arg_fileName) then
+			break;
+			//ireturn;
+		endif;
+		temp_count=temp_count+8;
+	endwhile;
+
+	//return -1 if it's not present
+	//print("temp_count");
+	//print(temp_count);
+	if(temp_count>= FAT+512) then
+		[physicalSP-2]=-1;
+		ireturn;
+	endif;
+
+	
+//print("fat_index");
+	fat_index=(temp_count-FAT)/8;
+	//print(fat_index);
+	
+
+
+	//checking file entry in system wide open call(SWOC) table
+
+	
+
+	temp_swoc=FILE_TABLE; //FILETABLE IS THE POINTER TO SWOC
+
+	while ([temp_swoc]!=fat_index && temp_swoc<1472) do
+		if([temp_swoc]==-1) then
+			break;
+		endif;
+		temp_swoc=temp_swoc+2;
+	endwhile;
+
+	if(temp_swoc>=1472) then
+	   [physicalSP-2]=-1;
+	   ireturn;
+	endif;
+//	print ("temp_swoc");
+//	print(temp_swoc);
+//	print([temp_swoc]);
+
+//temp_swoc contains the position of the matched entry or new entry.temp_swoc/2 is the index
+	
+
+	currentPCB = READY_LIST + 32 * ((PTBR - 1024) / 8);
+
+    
+    per_pointer=currentPCB+15;
+
+    while(per_pointer<currentPCB+31&&[per_pointer]!=-1) do
+    	per_pointer=per_pointer+2;
+    endwhile;
+
+    if(per_pointer>=currentPCB+31) then
+    	[physicalSP-2]=-1;
+	    ireturn;
+	endif;
+
+	
+	[per_pointer]=(temp_swoc-FILE_TABLE)/2;
+	[per_pointer+1]=0;
+
+	
+
+	if([temp_swoc]==-1) then
+		[temp_swoc]=fat_index;
+		[temp_swoc+1]=1;
+	else
+	    [temp_swoc+1]=[temp_swoc+1]+1;
+    endif;
+
+    [physicalSP-2]=[per_pointer];
+    ireturn;
+
+ endif;
+
+
+alias fileDescriptor S2;
+
+//sys_call_number for close function is 3
+//close takes the filedescriptor of the per process table and not the file name
+ 
+if(sys_call_Number==3) then 
+  //perprocess open file table has only 8 entries
+  //print("in close");
+  //print("filedescriptor");
+	//print(fileDescriptor);
+  if([fileDescriptor]<0||[fileDescriptor]>=7) then
+  	[physicalSP-2]=-1;
+  	ireturn;
+  endif;
+
+  currentPCB = READY_LIST + 32 * ((PTBR - 1024) / 8);
+
+    //print ("per_pointer");
+   per_pointer=currentPCB+15;
+   per_pointer=per_pointer+fileDescriptor*2;
+//print(per_pointer);
+   if([per_pointer]==-1) then
+     [physicalSP-2]=-1;
+     ireturn;
+    endif;
+
+    temp_swoc=FILE_TABLE+[per_pointer]*2;
+    [temp_swoc+1]=[temp_swoc+1]-1;
+  //  print("swoc");
+   // print([temp_swoc]);
+    //print (temp_swoc);
+
+    if([temp_swoc+1]==0) then
+       [temp_swoc]=-1;
+       [temp_swoc+1]=-1;
+    endif;
+//print([temp_swoc]);
+    [per_pointer]=-1;
+    [per_pointer+1]=-1;
+    [physicalSP-2]=0;
+    ireturn;
+endif;
+ 
+
+
+
+

@@ -1,0 +1,107 @@
+//the wrsite system call =5 calls interrupt4
+
+alias physicalSP S0;
+
+//formula to calculate sp
+
+physicalSP= ([PTBR+2*(SP/512)]*512)+(SP%512);
+
+//register for systemcallnumber
+
+alias sys_call_Number S1;
+alias value S2;
+alias fileSeekValue S3;
+alias fileDescriptor S4;
+alias temp_count S5;
+alias perProcessIndex S6;
+alias currentPCB S7;
+alias fileSwocEntry S8;
+alias fatEntry S9;
+
+
+//we reduce by 1 because in memory address or values take one word
+
+sys_call_Number=[physicalSP-1];
+
+//getting the arguments, if there are n arguments we need n registers.
+
+	fileDescriptor=[physicalSP-4];
+	value=[physicalSP-3];
+
+if(sys_call_Number==5) then
+    
+    if(fileDescriptor<0 || fileDescriptor>7) then
+    	[physicalSP-2]=-1;
+        ireturn;
+    endif;
+
+    //get PID,then from PCB load the value of file descriptor
+
+    currentPCB= (PTBR-1024)/8;
+    currentPCB=  READY_LIST+currentPCB*32;
+    perProcessIndex=currentPCB+15+2*fileDescriptor;
+    if([perProcessIndex]==-1) then
+    	[physicalSP-2]=-1;
+    	ireturn;
+    endif;
+//    print("perProcessIndex");
+  //  print(perProcessIndex);
+
+
+   //filedescriptor-> index of perprocess open file table
+    //[perprocess]-> swoc index
+    //[swoc position]-> fat index == [perprocessindex]
+    
+    fileSeekValue=[perProcessIndex+1];
+    fileSwocEntry=[perProcessIndex]*2+FILE_TABLE;
+    fatEntry=[fileSwocEntry]*8+FAT;
+
+    //print("fatentry");
+    //print(fatEntry);
+
+    load (1,[fatEntry+2]);
+    //currentPCB doubles up as the value of the datablock;
+
+    currentPCB=fileSeekValue/512+SCRATCHPAD;
+    //print("currentPCB");
+    //print(currentPCB);
+    if(currentPCB>255+SCRATCHPAD) then
+        [physicalSP-2]=-1;
+        ireturn;
+    endif;
+    if([currentPCB]==-1) then
+    	temp_count=DISK_LIST+20;
+        while([temp_count]!=0&&temp_count<448+DISK_LIST) do
+           temp_count=temp_count+1;
+        endwhile;
+        if(temp_count>=DISK_LIST+448) then
+        	[physicalSP-2]=-1;
+        	ireturn;
+        endif;
+
+      	[temp_count]=1;  
+
+        temp_count=temp_count-DISK_LIST;
+      
+      //  print("diskentry");
+        //print(temp_count);
+        [currentPCB]=temp_count;
+        store(1,[fatEntry+2]);
+        [fatEntry+1]=[fatEntry+1]+512;
+        store (5,19);
+        store (6,20);
+    endif;
+
+    alias datablock2 S10;
+    datablock2=[currentPCB];
+
+
+    load (1,datablock2);
+    [fileSeekValue%512+SCRATCHPAD]=value;
+    store (1,datablock2);
+
+    [perProcessIndex+1]=[perProcessIndex+1]+1;
+
+    [physicalSP-2]=0;
+    ireturn;
+endif;

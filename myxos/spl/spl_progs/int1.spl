@@ -1,0 +1,171 @@
+//interrupt1 is called for create and delete both have one argument
+alias physicalSP S0;
+
+//formula to calculate sp
+
+physicalSP= ([PTBR+2*(SP/512)]*512)+(SP%512);
+
+//register for systemcallnumber
+
+alias sys_call_Number S1;
+alias temp_df_count S4;
+alias scratchpadcount S5;
+
+//we reduce by 1 because in memory address or values take one word
+
+sys_call_Number=[physicalSP-1];
+
+//getting the arguments, if there are n arguments we need n registers.
+//since create and delete both have only one argument we take only one register
+
+alias arg_fileName S2;
+arg_fileName = [physicalSP-3]; 
+
+alias temp_count S3;
+
+temp_count=FAT;
+
+if(sys_call_Number==1) then
+	
+	//check if it's already there in the disk
+	while (temp_count <FAT+512 && [temp_count]!=-1) do 
+		if([temp_count]==arg_fileName) then
+			[physicalSP-2]=0;
+			ireturn;
+		endif;
+		temp_count=temp_count+8;
+	endwhile;
+	//if no free entry is there return -1
+	if(temp_count>= FAT+512) then
+		[physicalSP-2]=-1;
+		ireturn;
+	endif;
+
+	//checking free block in disk free list
+
+	
+
+	temp_df_count=DISK_LIST+20; //0-20 is reserved for memory 448-511 for swap space
+    
+	
+
+	while (temp_df_count<DISK_LIST+448) do
+		if([temp_df_count]==0) then
+			[temp_count]= arg_fileName;
+		    [temp_count+1]=0;
+			[temp_count+2]=temp_df_count-DISK_LIST;
+			//print([temp_count+2]);
+			load (1,[temp_count+2]);
+			scratchpadcount=SCRATCHPAD;
+			while(scratchpadcount< SCRATCHPAD+512) do
+				[scratchpadcount]=-1;
+				scratchpadcount=scratchpadcount+1;
+			endwhile;
+			store (1,[temp_count+2]);   //store basic block after updating words to -1
+			[temp_df_count]=1;
+			store (5,19);      //store fat, df back to memory
+			store (6,20);
+			[physicalSP-2]=0;
+			ireturn;
+		endif;
+		temp_df_count=temp_df_count+1;
+	endwhile;
+    [physicalSP-2]=-1;
+    ireturn;
+ endif;
+
+ //delete system call. sys_call_Number=4
+
+if(sys_call_Number==4) then
+	
+	//check if it's there in the disk
+	while (temp_count <FAT+512 && [temp_count]!=-1) do 
+		if([temp_count]==arg_fileName) then
+			break;
+		endif;
+		temp_count=temp_count+8;
+	endwhile;
+
+	//if entry is not there return -1
+	if(temp_count>= FAT+512||[temp_count]==-1) then
+		[physicalSP-2]=-1;
+		ireturn;
+	endif;
+   
+   //temp_df_Count can double up as swoc variable
+
+   temp_df_count=FILE_TABLE;
+   
+   alias fat_entry S6;
+   fat_entry=temp_count;
+
+   temp_count=temp_count%FAT;
+   temp_count=temp_count/8;
+
+
+   
+
+   while(temp_df_count < FILE_TABLE+128) do
+      if([temp_df_count]==temp_count) then
+        [physicalSP-2]=-1;
+        ireturn;
+       endif;
+       temp_df_count=temp_df_count+2;
+    endwhile;
+
+    //print("basicblk");
+    //print([fat_entry+2]);
+    load (1,[fat_entry+2]);
+
+    alias datablock S7;
+    alias temporary S8;
+    alias counter S9;
+    
+    datablock=[SCRATCHPAD];
+    counter=SCRATCHPAD;
+
+    while (counter<SCRATCHPAD+256&& datablock!=-1) do
+    	//if([datablock]=="") then
+    	//	datablock=datablock+1;
+    	//	continue;
+    	//endif;
+    	//print (datablock);
+    	load (1,datablock);
+    	temporary=SCRATCHPAD;
+    	while(temporary<SCRATCHPAD+512) do
+    		[temporary]="";
+    	    temporary=temporary+1;
+    	endwhile;
+    	store(1,datablock);
+    	//print("x");
+    	//print(datablock);
+    	temp_df_count=DISK_LIST+datablock;
+    	[temp_df_count]=0;
+    	load (1,[fat_entry+2]);
+    	counter=counter+1;
+    	datablock=[counter];
+    endwhile;
+
+//fat_ebtry+2 has basic block number
+    load (1,[fat_entry+2]);
+    temporary=SCRATCHPAD;
+    while(temporary<SCRATCHPAD+512) do
+        [temporary]="";
+    	temporary = temporary + 1;
+    endwhile;
+    store (1,[fat_entry+2]);
+    //print("y");
+    //print([fat_entry+2]);
+    temp_df_count=DISK_LIST+[fat_entry+2];
+    [temp_df_count]=0;
+
+    [fat_entry]=-1;
+    [fat_entry+2]=-1;
+    [fat_entry+1]=0;
+
+    store (5,19);
+    store (6,20);
+
+    [physicalSP-2]=0;
+    ireturn;
+   endif;

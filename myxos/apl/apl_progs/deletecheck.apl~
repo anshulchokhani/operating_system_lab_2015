@@ -1,0 +1,12 @@
+decl
+  integer status;
+enddecl
+integer main()
+{
+
+
+status = Delete ("sample.dat");
+print (status);
+  
+  return 0;
+}
